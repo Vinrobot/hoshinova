@@ -10,11 +10,29 @@ pub struct Config {
     pub scraper: ScraperConfig,
     pub notifier: Option<NotifierConfig>,
     pub webserver: Option<WebserverConfig>,
+    pub storage: Option<StorageConfig>,
     pub channel: Vec<ChannelConfig>,
 
     #[serde(skip)]
     #[ts(skip)]
     config_path: String,
+}
+
+#[derive(Clone, TS, Serialize, Deserialize, Debug)]
+#[ts(export, export_to = "web/src/bindings/")]
+pub struct StorageConfig {
+    pub s3: S3Config,
+}
+
+#[derive(Clone, TS, Serialize, Deserialize, Debug)]
+#[ts(export, export_to = "web/src/bindings/")]
+pub struct S3Config {
+    pub access_key: Option<String>,
+    pub secret_key: Option<String>,
+    pub bucket: String,
+    pub region: Option<String>,
+    pub endpoint: Option<String>,
+    pub path_style: Option<bool>,
 }
 
 #[derive(Clone, TS, Serialize, Deserialize, Debug)]

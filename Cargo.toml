@@ -41,6 +41,11 @@ clap = { version = "3.2.8", features = ["derive"] }
 env_logger = "0.8.4"
 log = "0.4"
 
+# Storage
+rust-s3 = "0.32.3"
+aws-creds = "0.30.0"
+aws-region = "0.25.1"
+
 [build-dependencies]
 chrono = "0.4.0"
 

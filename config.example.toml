@@ -28,6 +28,16 @@ notify_on = ["waiting", "recording", "done", "failed"]
 [webserver]
 bind_address = "0.0.0.0:1104"
 
+# Upload to a S3-compatible storage
+# channel.outpath is used as object prefix
+[storage.s3]
+access_key = "AKIAIOSFODNN7EXAMPLE"
+secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+bucket = "hoshinova"
+region = "us-east-1"
+# endpoint = "http://minio"
+# path_style = true
+
 [[channel]]
 id = "UCP0BspO_AMEe3aQqqpo89Dg"
 name = "Moona Hoshinova"

@@ -23,6 +23,10 @@ use tokio::{
 };
 use ts_rs::TS;
 
+use awscreds::Credentials;
+use awsregion::Region;
+use s3::Bucket;
+
 pub struct YTArchive {
     config: Arc<RwLock<Config>>,
     active_ids: Arc<RwLock<HashSet<String>>>,
@@ -31,6 +35,39 @@ pub struct YTArchive {
 impl YTArchive {
     async fn record(cfg: Config, task: Task, bus: &mut BusTx<Message>) -> Result<()> {
         let task_name = format!("[{}][{}][{}]", task.video_id, task.channel_name, task.title);
+
+        let bucket: Option<Bucket>;
+        if let Some(storage) = cfg.storage {
+            let s3 = storage.s3;
+            let credentials = Credentials::new(
+                s3.access_key.as_deref(),
+                s3.secret_key.as_deref(),
+                None,
+                None,
+                None,
+            )?;
+
+            let region: Region;
+            if let Some(endpoint) = s3.endpoint.as_ref() {
+                let region_name = match s3.region {
+                    Some(v) => v,
+                    None => endpoint.to_string(),
+                };
+                region = Region::Custom { region: region_name, endpoint: endpoint.to_string() };
+            } else if let Some(region_name) = s3.region {
+                region = region_name.parse()?;
+            } else {
+                region = Region::UsEast1;
+            }
+
+            if s3.path_style.unwrap_or(false) {
+                bucket = Some(Bucket::new(&*s3.bucket, region, credentials)?.with_path_style());
+            } else {
+                bucket = Some(Bucket::new(&*s3.bucket, region, credentials)?);
+            }
+        } else {
+            bucket = None;
+        }
 
         // Ensure the working directory exists
         let cfg = cfg.ytarchive;
@@ -267,8 +304,24 @@ impl YTArchive {
             .ok_or(anyhow!("Failed to get filename"))?;
         let destpath = Path::new(&task.output_directory).join(filename);
 
-        // Try to rename the file into the output directory
-        if let Err(_) = fs::rename(frompath, &destpath) {
+        if let Some(bucket) = bucket {
+            info!("{} Uploading to storage", task_name);
+
+            let fname = destpath.as_path().display().to_string();
+            let mut path = tokio::fs::File::open(frompath).await?;
+            let status_code = bucket.put_object_stream(&mut path, &*fname).await?;
+            if status_code != 200 {
+                return Err(anyhow!("Failed to upload record to storage (status code: {})", status_code));
+            }
+
+            info!(
+                "{} Uploaded output file to s3://{}, removing original",
+                task_name,
+                destpath.display(),
+            );
+            fs::remove_file(frompath)
+                .map_err(|e| anyhow!("Failed to remove original file: {:?}", e))?;
+        } else if let Err(_) = fs::rename(frompath, &destpath) {
             debug!(
                 "{} Failed to rename file to output, trying to copy",
                 task_name,
